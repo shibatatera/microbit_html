@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>レゴカー コントローラー</title>
+    <style>
+      /* CSSは前回と全く同じです */
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #1a1a1a;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      #connect {
+        padding: 10px 20px;
+        font-size: 1rem;
+        background-color: #27ae60;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-bottom: 20px;
+      }
+      #connect.connected {
+        background-color: #7f8c8d;
+        cursor: default;
+      }
+
+      #wheel-container {
+        position: relative;
+        width: 320px;
+        height: 320px;
+        user-select: none;
+        touch-action: none;
+        margin-bottom: 30px;
+      }
+
+      #wheel {
+        width: 100%;
+        height: 100%;
+        background-color: #333;
+        background-image:
+          radial-gradient(circle at center, #555 0%, #333 70%),
+          linear-gradient(
+            90deg,
+            transparent 42%,
+            #222 42%,
+            #222 58%,
+            transparent 58%
+          ),
+          linear-gradient(
+            0deg,
+            transparent 45%,
+            #222 45%,
+            #222 55%,
+            transparent 55%
+          );
+        border-radius: 50%;
+        box-shadow:
+          0 10px 30px rgba(0, 0, 0, 0.7),
+          inset 0 0 60px rgba(0, 0, 0, 0.9);
+        border: 15px solid #222;
+        box-sizing: border-box;
+        cursor: grab;
+        transform-origin: center center;
+        position: relative;
+      }
+      #wheel:active {
+        cursor: grabbing;
+      }
+
+      #wheel::before {
+        content: "";
+        position: absolute;
+        top: -15px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 15px;
+        height: 30px;
+        background-color: #f1c40f;
+        border-radius: 3px;
+        box-shadow: 0 0 10px rgba(241, 196, 15, 0.7);
+      }
+
+      #wheel::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 80px;
+        height: 80px;
+        background-color: #222;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        border: 2px solid #333;
+      }
+
+      .throttle-container {
+        background: #2c3e50;
+        padding: 15px 25px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+      }
+      .throttle-label {
+        font-weight: bold;
+        font-size: 1.2rem;
+      }
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 250px;
+        background: transparent;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 25px;
+        width: 25px;
+        border-radius: 50%;
+        background: #e74c3c;
+        cursor: pointer;
+        margin-top: -10px;
+      }
+      input[type="range"]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 5px;
+        cursor: pointer;
+        background: #7f8c8d;
+        border-radius: 5px;
+      }
+      .debug-info {
+        margin-top: 15px;
+        color: #aaa;
+        font-family: monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="connect">micro:bitに接続</button>
+
+    <div id="wheel-container">
+      <div id="wheel"></div>
+    </div>
+
+    <div class="throttle-container">
+      <span class="throttle-label">◀ 後退</span>
+      <input type="range" id="throttle" min="-100" max="100" value="0" />
+      <span class="throttle-label">前進 ▶</span>
+    </div>
+
+    <div class="debug-info">
+      送信データ: <span id="debug-text">停止中</span>
+    </div>
+
+    <script>
+      let port;
+      let writer;
+      let isDragging = false;
+      let startAngle = 0;
+      let currentWheelRotation = 0;
+      let returnAnimationId = null; // ★自動戻りアニメーションのIDを管理
+
+      const connectBtn = document.getElementById("connect");
+      const wheel = document.getElementById("wheel");
+      const container = document.getElementById("wheel-container");
+      const throttleSlider = document.getElementById("throttle");
+      const debugText = document.getElementById("debug-text");
+
+      // シリアルポートの接続
+      connectBtn.onclick = async () => {
+        if (port) return;
+        try {
+          port = await navigator.serial.requestPort();
+          await port.open({ baudRate: 115200 });
+          writer = port.writable.getWriter();
+          connectBtn.innerText = "接続済み";
+          connectBtn.classList.add("connected");
+          sendDriveData();
+        } catch (err) {
+          console.error("接続失敗:", err);
+        }
+      };
+
+      // イベントリスナー
+      container.addEventListener("mousedown", startDrag);
+      window.addEventListener("mousemove", drag);
+      window.addEventListener("mouseup", endDrag);
+
+      container.addEventListener("touchstart", startDrag, { passive: false });
+      window.addEventListener("touchmove", drag, { passive: false });
+      window.addEventListener("touchend", endDrag);
+
+      throttleSlider.addEventListener("input", sendDriveData);
+      throttleSlider.addEventListener("dblclick", () => {
+        throttleSlider.value = 0;
+        sendDriveData();
+      });
+
+      function getAngle(clientX, clientY) {
+        const rect = container.getBoundingClientRect();
+        const dx = clientX - (rect.left + rect.width / 2);
+        const dy = clientY - (rect.top + rect.height / 2);
+        return Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+      }
+
+      function startDrag(e) {
+        if (!port) return;
+        isDragging = true;
+
+        // ★ハンドルを掴んだら、自動戻りアニメーションをキャンセルする
+        if (returnAnimationId) {
+          cancelAnimationFrame(returnAnimationId);
+          returnAnimationId = null;
+        }
+
+        const event = e.touches ? e.touches[0] : e;
+        startAngle =
+          getAngle(event.clientX, event.clientY) - currentWheelRotation;
+        if (e.cancelable) e.preventDefault();
+      }
+
+      function drag(e) {
+        if (!isDragging || !port) return;
+        const event = e.touches ? e.touches[0] : e;
+        let angle = getAngle(event.clientX, event.clientY) - startAngle;
+
+        if (angle > 90) angle = 90;
+        if (angle < -90) angle = -90;
+
+        currentWheelRotation = angle;
+        wheel.style.transform = `rotate(${currentWheelRotation}deg)`;
+
+        sendDriveData();
+        if (e.cancelable) e.preventDefault();
+      }
+
+      function endDrag() {
+        if (!isDragging) return;
+        isDragging = false;
+        // ★手を離したら自動でセンターに戻る処理を開始
+        returnToCenter();
+      }
+
+      // ★ハンドルを自動で真っ直ぐ（0度）に戻す関数
+      function returnToCenter() {
+        // 0.8を掛けることで、最初は速く、中心に近づくほどゆっくり戻る（バネのような動き）
+        currentWheelRotation *= 0.8;
+
+        // 角度がほぼ0になったら、完全に0にしてアニメーションを終了する
+        if (Math.abs(currentWheelRotation) < 0.5) {
+          currentWheelRotation = 0;
+          wheel.style.transform = `rotate(0deg)`;
+          sendDriveData();
+          returnAnimationId = null;
+          return;
+        }
+
+        // 見た目を更新し、モーターにデータを送る
+        wheel.style.transform = `rotate(${currentWheelRotation}deg)`;
+        sendDriveData();
+
+        // ブラウザの次の描画タイミングで再度この関数を呼び出す（ループ）
+        returnAnimationId = requestAnimationFrame(returnToCenter);
+      }
+
+      // 送信ロジック（前回と同じ）
+      let lastSentData = "";
+
+      async function sendDriveData() {
+        if (!writer) return;
+
+        let throttle = parseInt(throttleSlider.value);
+        let steering = (currentWheelRotation / 90) * 100;
+
+        let leftSpeed = throttle + steering;
+        let rightSpeed = throttle - steering;
+
+        leftSpeed = Math.max(-100, Math.min(100, leftSpeed));
+        rightSpeed = Math.max(-100, Math.min(100, rightSpeed));
+
+        const STOP_DUTY = 77;
+        const RANGE = 25;
+
+        let pin0_val = Math.round(STOP_DUTY + (leftSpeed * RANGE) / 100);
+        let pin1_val = Math.round(STOP_DUTY - (rightSpeed * RANGE) / 100);
+
+        let sendStr = `${pin0_val},${pin1_val}\n`;
+
+        if (sendStr !== lastSentData) {
+          try {
+            const encoder = new TextEncoder();
+            await writer.write(encoder.encode(sendStr));
+            lastSentData = sendStr;
+            debugText.innerText = `pin0: ${pin0_val}, pin1: ${pin1_val}`;
+          } catch (err) {
+            console.error("送信エラー:", err);
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

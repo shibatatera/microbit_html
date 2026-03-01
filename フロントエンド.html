@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ボタンの練習</title>
+    <style>
+        /* 背景を青色にする設定 */
+        body {
+            background-color: #007bff; /* 鮮やかな青色 */
+            display: flex;
+            justify-content: center; /* 横方向の中央 */
+            align-items: center;    /* 縦方向の中央 */
+            height: 100vh;          /* 画面いっぱいの高さ */
+            margin: 0;
+        }
+        /* マウスでクリックできるボタン */
+        .my-button {
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;        /* マウスを乗せると指マークになる */
+            background-color: white;
+            border: none;
+            border-radius: 5px;     /* 角を少し丸くする */
+            transition: 0.3s;       /* 変化をなめらかに */
+        }
+
+        /* マウスを乗せた時の動き */
+        .my-button:hover {
+            background-color: #eeeeee;
+            transform: scale(1.1);  /* 少し大きくする */
+        }
+        
+        /* スライダーを囲む箱（ここで高さを決める） */
+        .slider-wrapper {
+            width: 50px;
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+        /* スライダーの外枠 */
+        .slider-container {
+            /* width: 20px; */
+            height: 300px; /* スライダーの長さ（高さ） */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #59aa23;
+        }
+        /* スライダー本体を垂直にする設定 */
+        input[type="range"].vertical {
+            /*appearance: slider-vertical; /* スライダーを縦向きにする。ブラウザ標準の垂直設定 または transform: rotate(-90deg); で回転させる*/
+            /*width: 20px; /* スライダー自体の見た目じゃなくて使用領域？ */
+            /*height: 200px; /* スライダー自体の高さ */
+            /*cursor: pointer;*/
+
+            -webkit-appearance: none; /* ブラウザ標準の見た目を消す */
+            appearance: none;
+            width: 10px;               /* 棒の太さ */
+            height: 300px;             /* スライダーの長さ */
+            background: #ee0000;          /* 棒の色（グレー） */
+            outline: none;
+            border-radius: 5px;        /* 棒の角を丸める */
+            writing-mode: bt-lr;       /* 縦方向に設定 (Firefox用) */
+            -webkit-appearance: slider-vertical; /* 縦方向に設定 (Chrome用) */
+        }
+        /* 【つまみ】の部分のデザイン (Chrome, Edge, Safari用) */
+        /* input[type="range"].vertical::-webkit-slider-thumb で「スライダーの中にある『つまみ』という部品」を指名する書き方です。 */
+        input[type="range"].vertical::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 30px;               /* つまみの横幅 */
+            height: 30px;              /* つまみの縦幅 */
+            background: #ffeb3b;       /* つまみの色（黄色） */
+            cursor: pointer;
+            border-radius: 50%;        /* 真ん丸にする */
+            border: 3px solid #333;    /* 縁取りをつける */
+            box-shadow: 0 0 5px rgba(0,0,0,0.3); /* 影をつけて立体的に */
+        }
+
+        /* 【つまみ】の部分のデザイン (Firefox用) */
+        input[type="range"].vertical::-moz-range-thumb {
+            width: 30px;
+            height: 30px;
+            background: #ffeb3b;
+            cursor: pointer;
+            border-radius: 50%;
+            border: 3px solid #333;
+        }
+        
+        /* 値を表示するテキスト */
+        #value-display {
+            font-size: 2rem;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <button class="my-button" onclick="alert('クリックされました！')">ここをクリック</button>
+    <div class="slider-container">
+        <p>スライダー 100 ~ 0</p>
+        <input type="range" id="mySlider" class="vertical" min="0" max="100" value="50" step="1">
+        <div id="value-display">50</div>
+    </div>
+
+    <script>
+        // HTML要素を取得
+        const slider = document.getElementById('mySlider');
+        const display = document.getElementById('value-display');
+
+        // スライダーの値が変化したときに動く関数
+        slider.addEventListener('input', () => {
+            const val = slider.value;
+            display.textContent = val; // 画面の数字を更新
+            
+            // コンソール（開発者ツール）にも値を出す
+            console.log("現在の値:", val);
+
+            // スライダーを上げるとつまみの色が変わる 値が大きくなるほど赤っぽく、小さいほど白っぽくする
+            // 実行したらスライダー下の数字の色が変わった
+            display.style.color = `rgb(255, ${255 - val * 2}, ${255 - val * 2})`;
+        });
+    </script>
+
+</body>
+</html>

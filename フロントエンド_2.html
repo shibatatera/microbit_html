@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>カスタム垂直スライダー</title>
+    <style>
+        body {
+            background-color: #007bff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            font-family: sans-serif;
+        }
+
+        /* スライダーを囲む箱（ここで高さを決める） */
+        .slider-wrapper {
+            width: 50px;
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* スライダー本体のカスタマイズ */
+        input[type="range"] {
+            -webkit-appearance: none; /* 標準デザインを解除 */
+            appearance: none;
+            width: 300px;             /* 縦にしたい長さを「幅」として指定 */
+            height: 10px;              /* 棒の太さ */
+            background: #ddd;          /* 棒の色 */
+            border-radius: 5px;
+            outline: none;
+            
+            /* 【重要】横向きをマイナス90度回転させて垂直にする */
+            transform: rotate(-90deg);
+            margin: 145px 0;           /* 回転後の位置調整 */
+        }
+
+        /* つまみのデザイン（Chrome用） */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 30px;
+            height: 30px;
+            background: #ffeb3b;       /* つまみの色（黄色） */
+            border-radius: 50%;        /* 丸くする */
+            border: 3px solid #333;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        #value-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="slider-wrapper">
+        <div id="value-display">50</div>
+        
+        <input type="range" id="mySlider" min="0" max="100" value="50">
+        
+        <p>音量</p>
+    </div>
+
+    <script>
+        const slider = document.getElementById('mySlider');
+        const display = document.getElementById('value-display');
+
+        slider.addEventListener('input', () => {
+            display.textContent = slider.value;
+        });
+    </script>
+
+</body>
+</html>
